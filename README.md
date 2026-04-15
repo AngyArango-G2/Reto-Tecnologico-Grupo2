@@ -1,2 +1,2 @@
-# Reto-Tecnologico-Grupo2
+# sinitt-g2
 Proyecto de analìtica de datos - Nodo Eafit 
