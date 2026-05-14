@@ -1,0 +1,25 @@
+let
+    Origen = Folder.Files("C:\Users\LICET\Downloads\copias para mod\Rutas"),
+    #"Archivos ocultos filtrados1" = Table.SelectRows(Origen, each [Attributes]?[Hidden]? <> true),
+    #"Invocar función personalizada1" = Table.AddColumn(#"Archivos ocultos filtrados1", "Transformar archivo", each #"Transformar archivo"([Content])),
+    #"Columnas con nombre cambiado1" = Table.RenameColumns(#"Invocar función personalizada1", {"Name", "Source.Name"}),
+    #"Otras columnas quitadas1" = Table.SelectColumns(#"Columnas con nombre cambiado1", {"Source.Name", "Transformar archivo"}),
+    #"Columna de tabla expandida1" = Table.ExpandTableColumn(#"Otras columnas quitadas1", "Transformar archivo", Table.ColumnNames(#"Transformar archivo"(#"Archivo de ejemplo"))),
+    #"Columnas quitadas" = Table.RemoveColumns(#"Columna de tabla expandida1",{"objectid"}),
+    #"Columnas reordenadas" = Table.ReorderColumns(#"Columnas quitadas",{"Source.Name", "id_ruta", "nombre", "codigo", "recorrido", "from_date", "sistema", "tipo", "empresa", "id_gflota", "longitud", "fecha_actualizacion", "shape_length"}),
+    #"Columnas quitadas1" = Table.RemoveColumns(#"Columnas reordenadas",{"Source.Name"}),
+    #"Columnas reordenadas1" = Table.ReorderColumns(#"Columnas quitadas1",{"id_ruta", "nombre", "codigo", "sistema", "tipo", "empresa", "longitud", "recorrido", "from_date", "id_gflota", "fecha_actualizacion", "shape_length"}),
+    #"Columnas quitadas2" = Table.RemoveColumns(#"Columnas reordenadas1",{"id_gflota", "fecha_actualizacion", "shape_length"}),
+    #"Tipo cambiado con configuración regional" = Table.TransformColumnTypes(#"Columnas quitadas2", {{"from_date", type text}}, "en-US"),
+    #"Tipo cambiado" = Table.TransformColumnTypes(#"Tipo cambiado con configuración regional",{{"from_date", type datetime}}),
+    #"Tipo cambiado con configuración regional1" = Table.TransformColumnTypes(#"Tipo cambiado", {{"longitud", type text}}, "en-US"),
+    #"Tipo cambiado con configuración regional2" = Table.TransformColumnTypes(#"Tipo cambiado con configuración regional1", {{"longitud", type number}}, "en-US"),
+    Redondeado = Table.TransformColumns(#"Tipo cambiado con configuración regional2",{{"longitud", each Number.Round(_, 2), type number}}),
+    #"Tipo cambiado1" = Table.TransformColumnTypes(Redondeado,{{"longitud", type text}}),
+    #"Valor reemplazado" = Table.ReplaceValue(#"Tipo cambiado1",",",".",Replacer.ReplaceText,{"longitud"}),
+    #"Tipo cambiado2" = Table.TransformColumnTypes(#"Valor reemplazado",{{"longitud", type number}}),
+    #"Texto limpio" = Table.TransformColumns(#"Tipo cambiado2",{{"nombre", Text.Clean, type text}}),
+    #"Texto recortado" = Table.TransformColumns(#"Texto limpio",{{"nombre", Text.Trim, type text}}),
+    #"Texto limpio1" = Table.TransformColumns(#"Texto recortado",{{"codigo", Text.Clean, type text}, {"empresa", Text.Clean, type text}})
+in
+    #"Texto limpio1"
