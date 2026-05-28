@@ -1,0 +1,268 @@
+{
+  "name": "SINITT G2 — Pipeline de Actualización Automática",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "67c6db1b-f7d2-4d3f-99f7-1a0985d78f79",
+      "name": "Disparador Programado",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        592
+      ],
+      "notes": "Configura la frecuencia: diario, semanal, etc. Recomendado: 1 vez/día para no agotar el límite de 2.000 ejecuciones/mes de la capa gratuita."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "3559325b-a765-4437-ab8a-1e5fbd4db842",
+      "name": "Consultar API datos.gov.co — Verificar Actualizaciones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -656,
+        592
+      ],
+      "notes": "GET a la API de cada base de datos (BD5, BD6, BD7, etc.). Incluir parámetro de fecha para traer solo registros desde la última ejecución."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "8662051a-3b8f-472a-9bef-5b7a4ba49dcd",
+      "name": "¿Hay Registros Nuevos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        592
+      ],
+      "notes": "Compara la fecha del último registro recibido vs. la fecha de la última ejecución guardada. TRUE: hay datos nuevos → continúa. FALSE: no hay datos → rama de espera."
+    },
+    {
+      "parameters": {},
+      "id": "2daf6be6-b5ff-4bae-8cfd-589b360f6d90",
+      "name": "ETL — Limpieza y Normalización de Datos Nuevos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        464
+      ],
+      "notes": "Nodo Code (JavaScript). ETL liviano: corregir comas decimales (BD6), normalizar fechas, trim de strings. Preparar los registros limpios para insertar en Supabase."
+    },
+    {
+      "parameters": {},
+      "id": "4e134d04-a8f2-441d-8ff6-0efd6c38b48c",
+      "name": "Cargar Datos Crudos Limpios en Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        0,
+        464
+      ],
+      "notes": "Nodo nativo de Supabase. Insertar los registros limpios en las tablas de datos crudos (bd5_velocidad, bd6_intensidad, bd7_incidentes, etc.). Configurar credenciales: URL del proyecto + anon key."
+    },
+    {
+      "parameters": {},
+      "id": "6cbaef28-f046-4514-a207-fdeaf1e8b420",
+      "name": "Calcular KPIs en JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        464
+      ],
+      "notes": "Nodo Code (JavaScript). Recibe los datos limpios del nodo anterior y calcula los 4 KPIs del dashboard: KPI1 Índice de Congestión Vial, KPI2 Accidentalidad Vial, KPI3 Intensidad Vehicular Horaria, KPI4 Eficiencia de Red de Transporte. Devuelve los resultados listos para insertar en las tablas de KPIs en Supabase."
+    },
+    {
+      "parameters": {},
+      "id": "86865976-00b6-4205-bd53-494ee95fa7b9",
+      "name": "Escribir Resultados de KPIs en Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        464
+      ],
+      "notes": "Nodo nativo de Supabase. Escribe los KPIs calculados en tablas separadas: kpi_congestion, kpi_accidentalidad, kpi_intensidad_vehicular, kpi_eficiencia_red. Lovable lee directamente de estas tablas para actualizar el dashboard."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "b54e7db4-5151-4b57-99b8-dd9df9aa5640",
+      "name": "Enviar Correo de Informe al Encargado",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        672,
+        464
+      ],
+      "webhookId": "22317f37-b560-4de9-8d20-ea94960b5607",
+      "notes": "Correo automático con resumen de la actualización: número de registros nuevos por base de datos, KPIs recalculados y URL del dashboard. Configurar credenciales OAuth2 de Gmail."
+    },
+    {
+      "parameters": {},
+      "id": "65dfeb10-d962-4524-bbb5-e97b683687be",
+      "name": "Notificar al Encargado por WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        880,
+        464
+      ],
+      "webhookId": "282fdb58-8a71-42c4-ba69-212fe0f4e32f",
+      "notes": "Mensaje de aviso vía WhatsApp Business Cloud API. Texto sugerido: 'SINITT G2: El pipeline se ejecutó correctamente. Se cargaron X registros nuevos y los KPIs fueron recalculados. El informe detallado fue enviado a tu correo. Dashboard: [URL]'. Requiere cuenta de WhatsApp Business y token de la Meta API."
+    },
+    {
+      "parameters": {},
+      "id": "a9c556b9-3195-433b-b79c-0d7a481dab66",
+      "name": "Sin Datos Nuevos — Esperar Próximo Ciclo",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        704
+      ],
+      "notes": "Rama FALSE del nodo IF. No hace nada — el workflow termina limpiamente y espera el próximo disparo del Schedule Trigger."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Disparador Programado": {
+      "main": [
+        [
+          {
+            "node": "Consultar API datos.gov.co — Verificar Actualizaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar API datos.gov.co — Verificar Actualizaciones": {
+      "main": [
+        [
+          {
+            "node": "¿Hay Registros Nuevos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay Registros Nuevos?": {
+      "main": [
+        [
+          {
+            "node": "ETL — Limpieza y Normalización de Datos Nuevos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sin Datos Nuevos — Esperar Próximo Ciclo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ETL — Limpieza y Normalización de Datos Nuevos": {
+      "main": [
+        [
+          {
+            "node": "Cargar Datos Crudos Limpios en Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar Datos Crudos Limpios en Supabase": {
+      "main": [
+        [
+          {
+            "node": "Calcular KPIs en JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular KPIs en JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Escribir Resultados de KPIs en Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escribir Resultados de KPIs en Supabase": {
+      "main": [
+        [
+          {
+            "node": "Enviar Correo de Informe al Encargado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Correo de Informe al Encargado": {
+      "main": [
+        [
+          {
+            "node": "Notificar al Encargado por WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b23296ac-86fc-47c6-9352-738b4f64935e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e558a4c0a81262716eca3c7235aa34527ac7b60fb0bb71b6b5f64483d801c217"
+  },
+  "id": "G4PS4byJVSSAMYot",
+  "tags": [
+    {
+      "updatedAt": "2026-05-22T22:45:18.917Z",
+      "createdAt": "2026-05-22T22:45:18.917Z",
+      "id": "12FWakZV3Rzao9iV",
+      "name": "SINITT G2"
+    },
+    {
+      "updatedAt": "2026-05-22T22:45:18.926Z",
+      "createdAt": "2026-05-22T22:45:18.926Z",
+      "id": "8U6dnNw4qVSzWflB",
+      "name": "ETL Automatizado"
+    },
+    {
+      "updatedAt": "2026-05-22T22:45:18.920Z",
+      "createdAt": "2026-05-22T22:45:18.920Z",
+      "id": "nN25JsveoKh00aoo",
+      "name": "Movilidad Medellín"
+    }
+  ]
+}
